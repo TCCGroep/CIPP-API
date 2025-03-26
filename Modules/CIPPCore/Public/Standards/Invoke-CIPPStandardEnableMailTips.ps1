@@ -58,14 +58,12 @@ function Invoke-CIPPStandardEnableMailTips {
         if ($StateIsCorrect -eq $true) {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message 'All MailTips are enabled' -sev Info
         } else {
-            Write-StandardsAlert -message 'Not all MailTips are enabled' -object $MailTipsState -tenant $Tenant -standardName 'EnableMailTips' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Not all MailTips are enabled' -sev Info
+            Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Not all MailTips are enabled' -sev Alert
         }
     }
 
     if ($Settings.report -eq $true) {
-        $state = $StateIsCorrect ? $true : $MailTipsState
-        Set-CIPPStandardsCompareField -FieldName 'standards.EnableMailTips' -FieldValue $State -Tenant $tenant
+
         Add-CIPPBPAField -FieldName 'MailTipsEnabled' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $tenant
     }
 

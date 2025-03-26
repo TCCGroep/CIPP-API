@@ -32,14 +32,10 @@ function Invoke-CIPPStandardAtpPolicyForO365 {
 
     param($Tenant, $Settings)
     ##$Rerun -Type Standard -Tenant $Tenant -Settings $Settings 'AtpPolicyForO365'
-    try {
-        $CurrentState = New-ExoRequest -tenantid $Tenant -cmdlet 'Get-AtpPolicyForO365' |
-        Select-Object EnableATPForSPOTeamsODB, EnableSafeDocs, AllowSafeDocsOpen
-    } catch {
-        $CurrentState = @{
-            License = 'This tenant might not be licensed for this feature'
-        }
-    }
+
+    $CurrentState = New-ExoRequest -tenantid $Tenant -cmdlet 'Get-AtpPolicyForO365' |
+    Select-Object EnableATPForSPOTeamsODB, EnableSafeDocs, AllowSafeDocsOpen
+
     $StateIsCorrect = ($CurrentState.EnableATPForSPOTeamsODB -eq $true) -and
                       ($CurrentState.EnableSafeDocs -eq $true) -and
                       ($CurrentState.AllowSafeDocsOpen -eq $Settings.AllowSafeDocsOpen)
@@ -69,14 +65,11 @@ function Invoke-CIPPStandardAtpPolicyForO365 {
         if ($StateIsCorrect -eq $true) {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Atp Policy For O365 is enabled' -sev Info
         } else {
-            Write-StandardsAlert -message 'Atp Policy For O365 is not enabled' -object $CurrentState -tenant $Tenant -standardName 'AtpPolicyForO365' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Atp Policy For O365 is not enabled' -sev Info
+            Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Atp Policy For O365 is not enabled' -sev Alert
         }
     }
 
     if ($Settings.report -eq $true) {
-        $state = $StateIsCorrect -eq $true ? $true : $CurrentState
-        Set-CIPPStandardsCompareField -FieldName 'standards.AtpPolicyForO365' -FieldValue $state -TenantFilter $tenant
         Add-CIPPBPAField -FieldName 'AtpPolicyForO365' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $tenant
     }
 

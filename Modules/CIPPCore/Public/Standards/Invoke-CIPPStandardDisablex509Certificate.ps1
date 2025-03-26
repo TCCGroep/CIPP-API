@@ -48,14 +48,11 @@ function Invoke-CIPPStandardDisablex509Certificate {
         if ($StateIsCorrect -eq $true) {
             Write-LogMessage -API 'Standards' -tenant $tenant -message 'x509Certificate authentication method is not enabled' -sev Info
         } else {
-            Write-StandardsAlert -message 'x509Certificate authentication method is enabled' -object $CurrentState -tenant $tenant -standardName 'Disablex509Certificate' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $tenant -message 'x509Certificate authentication method is enabled' -sev Info
+            Write-LogMessage -API 'Standards' -tenant $tenant -message 'x509Certificate authentication method is enabled' -sev Alert
         }
     }
 
     if ($Settings.report -eq $true) {
-        $state = $StateIsCorrect ? $true : $CurrentState
-        Set-CIPPStandardsCompareField -FieldName 'standards.Disablex509Certificate' -FieldValue $state -TenantFilter $Tenant
         Add-CIPPBPAField -FieldName 'Disablex509Certificate' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $tenant
     }
 

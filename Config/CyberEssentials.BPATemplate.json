@@ -92,10 +92,7 @@
         "isMFARegistered",
         "defaultMFAMethod"
       ],
-      "URL": "https://graph.microsoft.com/beta/reports/authenticationMethods/userRegistrationDetails",
-      "Parameters": {
-        "asApp": "True"
-      }
+      "URL": "https://graph.microsoft.com/beta/reports/authenticationMethods/userRegistrationDetails"
     }
   ]
 }

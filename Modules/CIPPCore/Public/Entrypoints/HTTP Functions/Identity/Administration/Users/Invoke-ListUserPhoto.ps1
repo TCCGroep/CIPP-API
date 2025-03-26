@@ -3,7 +3,7 @@ using namespace System.Net
 Function Invoke-ListUserPhoto {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         Identity.User.Read
     #>

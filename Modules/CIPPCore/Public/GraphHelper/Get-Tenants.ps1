@@ -73,10 +73,6 @@ function Get-Tenants {
     $PartnerTenantState = Get-CIPPAzDataTableEntity @PartnerModeTable
 
     if (($BuildRequired -or $TriggerRefresh.IsPresent) -and $PartnerTenantState.state -ne 'owntenant') {
-        # Get TenantProperties table
-        $PropertiesTable = Get-CippTable -TableName 'TenantProperties'
-        $Aliases = Get-CIPPAzDataTableEntity @PropertiesTable -Filter "RowKey eq 'Alias'"
-
         #get the full list of tenants
         $GDAPRelationships = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/tenantRelationships/delegatedAdminRelationships?`$filter=status eq 'active' and not startsWith(displayName,'MLT_')$RelationshipFilter&`$select=customer,autoExtendDuration,endDateTime&`$top=300" -NoAuthCheck:$true
         $GDAPList = foreach ($Relationship in $GDAPRelationships) {
@@ -94,9 +90,6 @@ function Get-Tenants {
             # Write-Host (ConvertTo-Json -InputObject $_ -Depth 10)
             # Write-Host "Processing $($_.Name), $($_.displayName) to add to tenant list."
             $ExistingTenantInfo = Get-CIPPAzDataTableEntity @TenantsTable -Filter "PartitionKey eq 'Tenants' and RowKey eq '$($_.Name)'"
-
-            $Alias = ($Aliases | Where-Object { $_.PartitionKey -eq $_.Name }).Value
-
             if ($TriggerRefresh.IsPresent -and $ExistingTenantInfo.customerId) {
                 # Reset error count
                 Write-Host "Resetting error count for $($_.Name)"
@@ -104,7 +97,7 @@ function Get-Tenants {
                 Add-CIPPAzDataTableEntity @TenantsTable -Entity $ExistingTenantInfo -Force | Out-Null
             }
 
-            if ($ExistingTenantInfo -and $ExistingTenantInfo.RequiresRefresh -eq $false -and $ExistingTenantInfo.displayName -eq $LatestRelationship.displayName) {
+            if ($ExistingTenantInfo -and $ExistingTenantInfo.RequiresRefresh -eq $false) {
                 Write-Host 'Existing tenant found. We already have it cached, skipping.'
                 $ExistingTenantInfo
                 return
@@ -136,18 +129,11 @@ function Get-Tenants {
                 }
                 Write-Host 'finished getting domain'
 
-                if ($Aliases.PartitionKey -contains $_.Name -and ![string]::IsNullOrEmpty($Alias)) {
-                    $Alias = $Aliases | Where-Object { $_.PartitionKey -eq $_.Name }
-                    $displayName = $Alias.Value
-                } else {
-                    $displayName = $LatestRelationship.displayName
-                }
-
                 $Obj = [PSCustomObject]@{
                     PartitionKey             = 'Tenants'
                     RowKey                   = $_.Name
                     customerId               = $_.Name
-                    displayName              = $displayName
+                    displayName              = $LatestRelationship.displayName
                     relationshipEnd          = $LatestRelationship.relationshipEnd
                     relationshipCount        = $_.Count
                     defaultDomainName        = $defaultDomainName

@@ -2,10 +2,8 @@ using namespace System.Net
 
 Function invoke-ListEmptyResults {
     <#
-    .SYNOPSIS
-     - Purposely lists an empty result
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint - Purposely lists an empty result
     .ROLE
         CIPP.Core
     #>

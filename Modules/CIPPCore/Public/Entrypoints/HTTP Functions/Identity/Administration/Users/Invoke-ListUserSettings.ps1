@@ -3,7 +3,7 @@ using namespace System.Net
 function Invoke-ListUserSettings {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         Identity.User.Read
     #>

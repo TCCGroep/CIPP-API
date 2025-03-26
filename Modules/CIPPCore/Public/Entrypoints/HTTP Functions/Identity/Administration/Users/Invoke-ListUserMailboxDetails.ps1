@@ -1,6 +1,6 @@
 using namespace System.Net
 
-function Invoke-ListUserMailboxDetails {
+Function Invoke-ListUserMailboxDetails {
     <#
     .FUNCTIONALITY
         Entrypoint
@@ -64,9 +64,8 @@ function Invoke-ListUserMailboxDetails {
             }
         )
         Write-Host $UserID
-        $usernames = New-GraphGetRequest -tenantid $TenantFilter -uri 'https://graph.microsoft.com/beta/users?$select=id,userPrincipalName&$top=999'
+        #$username = (New-GraphGetRequest -tenantid $TenantFilter -uri "https://graph.microsoft.com/beta/users/$UserID").userPrincipalName
         $Results = New-ExoBulkRequest -TenantId $TenantFilter -CmdletArray $Requests -returnWithCommand $true -Anchor $username
-        Write-Host "First line of usernames is $($usernames[0] | ConvertTo-Json)"
 
         # Assign variables from $Results
         $MailboxDetailedRequest = $Results.'Get-Mailbox'
@@ -76,8 +75,7 @@ function Invoke-ListUserMailboxDetails {
         $ArchiveSizeRequest = $Results.'Get-MailboxStatistics'
         $BlockedSender = $Results.'Get-BlockedSenderAddress'
         $PermsRequest2 = $Results.'Get-RecipientPermission'
-
-        $StatsRequest = New-GraphGetRequest -uri "https://outlook.office365.com/adminapi/beta/$($TenantFilter)/Mailbox('$($UserID)')/Exchange.GetMailboxStatistics()" -Tenantid $TenantFilter -scope ExchangeOnline -noPagination $true
+        $StatsRequest = New-GraphGetRequest -uri "https://outlook.office365.com/adminapi/beta/$($TenantFilter)/Mailbox('$($MailboxDetailedRequest.UserPrincipalName)')/Exchange.GetMailboxStatistics()" -Tenantid $TenantFilter -scope ExchangeOnline -noPagination $true
 
 
         # Handle ArchiveEnabled and AutoExpandingArchiveEnabled
@@ -115,33 +113,17 @@ function Invoke-ListUserMailboxDetails {
 
     # Parse permissions
 
-    #Implemented as an arraylist that uses .add().
-    $ParsedPerms = [System.Collections.ArrayList]::new()
-    foreach ($PermSet in @($PermsRequest, $PermsRequest2)) {
+    $ParsedPerms = foreach ($PermSet in @($PermsRequest, $PermsRequest2)) {
         foreach ($Perm in $PermSet) {
             # Check if Trustee or User is not NT AUTHORITY\SELF
             $user = $Perm.Trustee ? $Perm.Trustee : $Perm.User
-            if ($user -and $user -ne 'NT AUTHORITY\SELF') {
-                $null = $ParsedPerms.Add([PSCustomObject]@{
-                        User         = $user
-                        AccessRights = ($Perm.AccessRights) -join ', '
-                    })
+            if ($user -ne 'NT AUTHORITY\SELF') {
+                [PSCustomObject]@{
+                    User         = $user
+                    AccessRights = ($Perm.AccessRights) -join ', '
+                }
             }
         }
-    }
-    if ($MailboxDetailedRequest.GrantSendOnBehalfTo) {
-        $MailboxDetailedRequest.GrantSendOnBehalfTo | ForEach-Object {
-            $id = $_
-            $username = $usernames | Where-Object { $_.id -eq $id }
-
-            $null = $ParsedPerms.Add([PSCustomObject]@{
-                    User         = $username.UserPrincipalName ? $username.UserPrincipalName : $_
-                    AccessRights = 'SendOnBehalf'
-                })
-        }
-    }
-    if ($ParsedPerms.Count -eq 0) {
-        $ParsedPerms = @()
     }
 
     # Get forwarding address

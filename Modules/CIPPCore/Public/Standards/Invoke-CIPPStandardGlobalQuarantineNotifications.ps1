@@ -40,10 +40,13 @@ function Invoke-CIPPStandardGlobalQuarantineNotifications {
         'PT4H' { New-TimeSpan -Hours 4 }
         'P1D' { New-TimeSpan -Days 1 }
         'P7D' { New-TimeSpan -Days 7 }
-        default { $null }
+        Default { $null }
     }
 
+    if ($Settings.report -eq $true) {
 
+        Add-CIPPBPAField -FieldName 'GlobalQuarantineNotificationsSet' -FieldValue [string]$CurrentState.EndUserSpamNotificationFrequency -StoreAs string -Tenant $Tenant
+    }
     # Get notification interval using null-coalescing operator
     $NotificationInterval = $Settings.NotificationInterval.value ?? $Settings.NotificationInterval
 
@@ -53,7 +56,7 @@ function Invoke-CIPPStandardGlobalQuarantineNotifications {
     } catch {
         $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
         Write-LogMessage -API 'Standards' -tenant $Tenant -message "GlobalQuarantineNotifications: Invalid NotificationInterval parameter set. Error: $ErrorMessage" -sev Error
-        return
+        Return
     }
 
     if ($Settings.remediate -eq $true) {
@@ -77,16 +80,7 @@ function Invoke-CIPPStandardGlobalQuarantineNotifications {
         if ($CurrentState.EndUserSpamNotificationFrequency -eq $WantedState) {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message "Global Quarantine Notifications are set to the desired value of $WantedState" -sev Info
         } else {
-            $Object = $CurrentState | Select-Object -Property * -ExcludeProperty '*@odata.type'
-            Write-StandardsAlert -message "Global Quarantine Notifications are not set to the desired value of $WantedState" -object $Object -tenant $Tenant -standardName 'GlobalQuarantineNotifications' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $Tenant -message "Global Quarantine Notifications are not set to the desired value of $WantedState" -sev Info
+            Write-LogMessage -API 'Standards' -tenant $Tenant -message "Global Quarantine Notifications are not set to the desired value of $WantedState" -sev Alert
         }
-    }
-
-    if ($Settings.report -eq $true) {
-        $notificationInterval = @{ NotificationInterval = "$(($CurrentState.EndUserSpamNotificationFrequency).totalHours) hours" }
-        $ReportState = $CurrentState.EndUserSpamNotificationFrequency -eq $WantedState ? $true : $notificationInterval
-        Set-CIPPStandardsCompareField -FieldName 'standards.GlobalQuarantineNotifications' -FieldValue $ReportState -Tenant $Tenant
-        Add-CIPPBPAField -FieldName 'GlobalQuarantineNotificationsSet' -FieldValue [string]$CurrentState.EndUserSpamNotificationFrequency -StoreAs string -Tenant $Tenant
     }
 }

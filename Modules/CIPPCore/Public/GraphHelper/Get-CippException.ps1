@@ -1,6 +1,5 @@
 function Get-CippException {
     Param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0)]
         $Exception
     )
 

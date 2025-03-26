@@ -43,6 +43,9 @@ function Invoke-CIPPStandardActivityBasedTimeout {
         Return
     }
 
+    # Backwards compatibility for v5.7.0 and older
+    if ($null -eq $timeout ) { $timeout = '01:00:00' }
+
     $CurrentState = New-GraphGetRequest -Uri 'https://graph.microsoft.com/beta/policies/activityBasedTimeoutPolicies' -tenantid $Tenant
     $StateIsCorrect = if ($CurrentState.definition -like "*$timeout*") { $true } else { $false }
 
@@ -81,13 +84,12 @@ function Invoke-CIPPStandardActivityBasedTimeout {
         if ($StateIsCorrect -eq $true) {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message "Activity Based Timeout is enabled and set to $timeout" -sev Info
         } else {
-            Write-StandardsAlert -message "Activity Based Timeout is not set to $timeout" -object ($CurrentState.definition | ConvertFrom-Json -ErrorAction SilentlyContinue).activitybasedtimeoutpolicy.ApplicationPolicies -tenant $Tenant -standardName 'ActivityBasedTimeout' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $Tenant -message "Activity Based Timeout is not set to $timeout" -sev Info
+            Write-LogMessage -API 'Standards' -tenant $Tenant -message "Activity Based Timeout is not set to $timeout" -sev Alert
         }
     }
 
     if ($Settings.report -eq $true) {
-        Set-CIPPStandardsCompareField -FieldName 'standards.ActivityBasedTimeout' -FieldValue $StateIsCorrect -TenantFilter $Tenant
+
         Add-CIPPBPAField -FieldName 'ActivityBasedTimeout' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $Tenant
     }
 

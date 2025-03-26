@@ -1542,7 +1542,7 @@ function Invoke-NinjaOneTenantSync {
                     Icon = 'fas fa-laptop'
                 },
                 @{
-                    Name = 'SharePoint Admin'
+                    Name = 'Sharepoint Admin'
                     Link = "https://admin.microsoft.com/Partner/beginclientsession.aspx?CTID=$($Customer.customerId)&CSDEST=SharePoint"
                     Icon = 'fas fa-shapes'
                 },

@@ -13,9 +13,6 @@ function Get-CIPPStandards {
         $runManually = $false
     )
 
-    # Get tenant groups
-    $TenantGroups = Get-TenantGroups
-
     # 1. Get all JSON-based templates from the "templates" table
     $Table = Get-CippTable -tablename 'templates'
     $Filter = "PartitionKey eq 'StandardsTemplateV2'"
@@ -119,21 +116,11 @@ function Get-CIPPStandards {
         # 4. For each tenant, figure out which templates apply, merge them, and output.
         foreach ($Tenant in $AllTenantsList) {
             $TenantName = $Tenant.defaultDomainName
+
             # Determine which templates apply to this tenant
             $ApplicableTemplates = $Templates | ForEach-Object {
                 $template = $_
-                $tenantFilterValues = $template.tenantFilter | ForEach-Object {
-                    $FilterValue = $_.value
-                    # Group lookup
-                    if ($_.type -eq 'Group') {
-                        ($TenantGroups | Where-Object {
-                            $_.Id -eq $FilterValue
-                        }).Members.defaultDomainName
-                    } else {
-                        $FilterValue
-                    }
-                }
-
+                $tenantFilterValues = $template.tenantFilter | ForEach-Object { $_.value }
                 $excludedTenantValues = @()
 
                 if ($template.excludedTenants) {

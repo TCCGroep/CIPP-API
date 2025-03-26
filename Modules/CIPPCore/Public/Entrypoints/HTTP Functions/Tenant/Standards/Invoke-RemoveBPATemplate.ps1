@@ -3,9 +3,9 @@ using namespace System.Net
 Function Invoke-RemoveBPATemplate {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
-        Tenant.Standards.ReadWrite
+        Tenant.ConditionalAccess.ReadWrite
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)

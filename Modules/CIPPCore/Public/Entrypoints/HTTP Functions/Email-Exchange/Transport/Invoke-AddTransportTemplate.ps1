@@ -3,7 +3,7 @@ using namespace System.Net
 Function Invoke-AddTransportTemplate {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         Exchange.TransportRule.ReadWrite
     #>

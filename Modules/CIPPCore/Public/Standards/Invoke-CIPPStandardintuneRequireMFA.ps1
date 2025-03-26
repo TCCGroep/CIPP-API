@@ -53,14 +53,12 @@ function Invoke-CIPPStandardintuneRequireMFA {
         if ($PreviousSetting.multiFactorAuthConfiguration -eq 'required') {
             Write-LogMessage -API 'Standards' -tenant $tenant -message 'Require to use MFA when joining/registering Entra Devices is enabled.' -sev Info
         } else {
-            Write-StandardsAlert -message 'Require to use MFA when joining/registering Entra Devices is not enabled' -object $PreviousSetting -tenant $tenant -standardName 'intuneRequireMFA' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $tenant -message 'Require to use MFA when joining/registering Entra Devices is not enabled.' -sev Info
+            Write-LogMessage -API 'Standards' -tenant $tenant -message 'Require to use MFA when joining/registering Entra Devices is not enabled.' -sev Alert
         }
     }
 
     if ($Settings.report -eq $true) {
         $RequireMFA = if ($PreviousSetting.multiFactorAuthConfiguration -eq 'required') { $true } else { $false }
-        Set-CIPPStandardsCompareField -FieldName 'standards.intuneRequireMFA' -FieldValue $RequireMFA -Tenant $tenant
         Add-CIPPBPAField -FieldName 'intuneRequireMFA' -FieldValue $RequireMFA -StoreAs bool -Tenant $tenant
     }
 }

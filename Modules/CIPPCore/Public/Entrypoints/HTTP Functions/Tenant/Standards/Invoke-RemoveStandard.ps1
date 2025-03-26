@@ -3,7 +3,7 @@ using namespace System.Net
 Function Invoke-RemoveStandard {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         Tenant.Standards.ReadWrite
     #>

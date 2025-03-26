@@ -39,8 +39,7 @@ function Invoke-CIPPStandardBookings {
     $StateIsCorrect = if ($CurrentState -eq $WantedState) { $true } else { $false }
 
     if ($Settings.report -eq $true) {
-        $state = $StateIsCorrect ? $true : $CurrentState
-        Set-CIPPStandardsCompareField -FieldName 'standards.Bookings' -FieldValue $state -TenantFilter $Tenant
+        # Default is not set, not set means it's enabled
         if ($null -eq $CurrentState ) { $CurrentState = $true }
         Add-CIPPBPAField -FieldName 'BookingsState' -FieldValue $CurrentState -StoreAs bool -Tenant $Tenant
     }
@@ -70,8 +69,7 @@ function Invoke-CIPPStandardBookings {
         if ($StateIsCorrect -eq $true) {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message "The tenant Bookings is set correctly to $state" -sev Info
         } else {
-            Write-StandardsAlert -message "The tenant Bookings is not set correctly to $state" -object @{CurrentState = $CurrentState; WantedState = $WantedState } -tenant $Tenant -standardName 'Bookings' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $Tenant -message "The tenant Bookings is not set correctly to $state" -sev Info
+            Write-LogMessage -API 'Standards' -tenant $Tenant -message "The tenant Bookings is not set correctly to $state" -sev Alert
         }
     }
 

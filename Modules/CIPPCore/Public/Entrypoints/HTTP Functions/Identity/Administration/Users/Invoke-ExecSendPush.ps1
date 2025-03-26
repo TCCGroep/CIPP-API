@@ -1,6 +1,6 @@
 using namespace System.Net
 
-function Invoke-ExecSendPush {
+Function Invoke-ExecSendPush {
     <#
     .FUNCTIONALITY
         Entrypoint
@@ -33,7 +33,7 @@ function Invoke-ExecSendPush {
                 Start-Sleep 1
                 $ClientToken = Get-ClientAccess -uri $uri -body $body -count $count
             } else {
-                throw "Could not get Client Token: $_"
+                Throw "Could not get Client Token: $_"
             }
         }
         return $ClientToken
@@ -41,7 +41,7 @@ function Invoke-ExecSendPush {
 
 
     # Get all service principals
-    $SPResult = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/servicePrincipals?`$top=999&`$select=id,appId" -tenantid $TenantFilter -AsApp $true
+    $SPResult = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/servicePrincipals?`$top=999&`$select=id,appId" -tenantid $TenantFilter
 
     # Check if we have one for the MFA App
     $SPID = ($SPResult | Where-Object { $_.appId -eq $MFAAppID }).id
@@ -52,7 +52,7 @@ function Invoke-ExecSendPush {
         $SPBody = [pscustomobject]@{
             appId = $MFAAppID
         }
-        $SPID = (New-GraphPostRequest -uri 'https://graph.microsoft.com/v1.0/servicePrincipals' -tenantid $TenantFilter -type POST -body $SPBody -AsApp $true).id
+        $SPID = (New-GraphPostRequest -uri 'https://graph.microsoft.com/v1.0/servicePrincipals' -tenantid $TenantFilter -type POST -body $SPBody ).id
     }
 
 
@@ -104,16 +104,16 @@ function Invoke-ExecSendPush {
 
         if ($obj.BeginTwoWayAuthenticationResponse.result) {
             $Body = "Received an MFA confirmation: $($obj.BeginTwoWayAuthenticationResponse.result.value | Out-String)"
-            $State = 'success'
+            $colour = 'success'
         }
         if ($obj.BeginTwoWayAuthenticationResponse.AuthenticationResult -ne $true) {
             $Body = "Authentication Failed! Does the user have Push/Phone call MFA configured? ErrorCode: $($obj.BeginTwoWayAuthenticationResponse.result.value | Out-String)"
-            $State = 'error'
+            $colour = 'error'
         }
 
     }
 
-    $Results = [pscustomobject]@{'Results' = @{ resultText = $Body; state = $State } }
+    $Results = [pscustomobject]@{'Results' = $Body; severity = $colour }
     Write-LogMessage -headers $Request.Headers -API $APINAME -message "Sent push request to $UserEmail - Result: $($obj.BeginTwoWayAuthenticationResponse.result.value | Out-String)" -Sev 'Info'
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{

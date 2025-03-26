@@ -9,19 +9,15 @@ function Invoke-ListMailQuarantineMessage {
     param($Request, $TriggerMetadata)
 
     $APIName = $Request.Params.CIPPEndpoint
-    $Headers = $Request.Headers
-    Write-LogMessage -headers $Headers -API $APIName -message 'Accessed this API' -Sev 'Debug'
-
-    # Interact with query parameters or the body of the request.
-    $TenantFilter = $Request.Query.tenantFilter
-    $Identity = $Request.Query.Identity
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+    $Tenantfilter = $Request.Query.Tenantfilter
 
     try {
-        $GraphRequest = New-ExoRequest -tenantid $TenantFilter -cmdlet 'Export-QuarantineMessage' -cmdParams @{ 'Identity' = $Identity }
+        $GraphRequest = New-ExoRequest -tenantid $TenantFilter -cmdlet 'Export-QuarantineMessage' -cmdParams @{ 'Identity' = $Request.Query.Identity }
         $EmlBase64 = $GraphRequest.Eml
         $EmlContent = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($EmlBase64))
         $Body = @{
-            'Identity' = $Identity
+            'Identity' = $Request.Query.Identity
             'Message'  = $EmlContent
         }
         $StatusCode = [HttpStatusCode]::OK

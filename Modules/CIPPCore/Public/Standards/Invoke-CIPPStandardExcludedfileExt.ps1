@@ -37,20 +37,20 @@ function Invoke-CIPPStandardExcludedfileExt {
     $Exts = $Exts | ForEach-Object { if ($_ -notlike '*.*') { "*.$_" } else { $_ } }
 
 
-    $MissingExclusions = foreach ($Exclusion in $Exts) {
+    $MissingExclutions = foreach ($Exclusion in $Exts) {
         if ($Exclusion -notin $CurrentInfo.excludedFileExtensionsForSyncApp) {
             $Exclusion
         }
     }
 
-    Write-Host "MissingExclusions: $($MissingExclusions)"
+    Write-Host "MissingExclutions: $($MissingExclutions)"
 
 
     If ($Settings.remediate -eq $true) {
 
         # If the number of extensions in the settings does not match the number of extensions in the current settings, we need to update the settings
-        $MissingExclusions = if ($Exts.Count -ne $CurrentInfo.excludedFileExtensionsForSyncApp.Count) { $true } else { $MissingExclusions }
-        if ($MissingExclusions) {
+        $MissingExclutions = if ($Exts.Count -ne $CurrentInfo.excludedFileExtensionsForSyncApp.Count) { $true } else { $MissingExclutions }
+        if ($MissingExclutions) {
             Write-Host "CurrentInfo.excludedFileExtensionsForSyncApp: $($CurrentInfo.excludedFileExtensionsForSyncApp)"
             Write-Host "Exts: $($Exts)"
             try {
@@ -68,16 +68,14 @@ function Invoke-CIPPStandardExcludedfileExt {
 
     if ($Settings.alert -eq $true) {
 
-        if ($MissingExclusions) {
-            Write-LogMessage -API 'Standards' -tenant $tenant -message "Excluded synced files does not contain $($MissingExclusions -join ',')" -sev Alert
+        if ($MissingExclutions) {
+            Write-LogMessage -API 'Standards' -tenant $tenant -message "Excluded synced files does not contain $($MissingExclutions -join ',')" -sev Alert
         } else {
             Write-LogMessage -API 'Standards' -tenant $tenant -message "Excluded synced files contains $($Settings.ext)" -sev Info
         }
     }
 
     if ($Settings.report -eq $true) {
-        $state = $MissingExclusions ? (@{ ext = $CurrentInfo.excludedFileExtensionsForSyncApp -join ',' }): $true
-        Set-CIPPStandardsCompareField -FieldName 'standards.ExcludedfileExt' -FieldValue $state -Tenant $tenant
         Add-CIPPBPAField -FieldName 'ExcludedfileExt' -FieldValue $CurrentInfo.excludedFileExtensionsForSyncApp -StoreAs json -Tenant $tenant
     }
 }

@@ -29,11 +29,14 @@ function Invoke-CIPPStandardPWcompanionAppAllowedState {
     #>
 
     param($Tenant, $Settings)
+    ##$Rerun -Type Standard -Tenant $Tenant -Settings $Settings 'PWcompanionAppAllowedState'
 
-    $authenticatorFeaturesState = (New-GraphGetRequest -tenantid $Tenant -Uri 'https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy/authenticationMethodConfigurations/microsoftAuthenticator')
+    $authenticatorFeaturesState = (New-GraphGetRequest -tenantid $Tenant -Uri 'https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy/authenticationMethodConfigurations/microsoftAuthenticator' -Type GET)
     $authState = if ($authenticatorFeaturesState.featureSettings.companionAppAllowedState.state -eq 'enabled') { $true } else { $false }
 
-
+    if ($Settings.report -eq $true) {
+        Add-CIPPBPAField -FieldName 'companionAppAllowedState' -FieldValue $authState -StoreAs bool -Tenant $Tenant
+    }
 
     # Get state value using null-coalescing operator
     $state = $Settings.state.value ?? $Settings.state
@@ -80,18 +83,7 @@ function Invoke-CIPPStandardPWcompanionAppAllowedState {
         if ($authState) {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message 'companionAppAllowedState is enabled.' -sev Info
         } else {
-            Write-StandardsAlert -message 'companionAppAllowedState is not enabled' -object $authenticatorFeaturesState -tenant $Tenant -standardName 'PWcompanionAppAllowedState' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $Tenant -message 'companionAppAllowedState is not enabled.' -sev Info
+            Write-LogMessage -API 'Standards' -tenant $Tenant -message 'companionAppAllowedState is not enabled.' -sev Alert
         }
-    }
-
-    if ($Settings.report -eq $true) {
-        Add-CIPPBPAField -FieldName 'companionAppAllowedState' -FieldValue $authState -StoreAs bool -Tenant $Tenant
-        if ($authState) {
-            $FieldValue = $true
-        } else {
-            $FieldValue = $authenticatorFeaturesState.featureSettings.companionAppAllowedState
-        }
-        Set-CIPPStandardsCompareField -FieldName 'standards.PWcompanionAppAllowedState' -FieldValue $FieldValue -Tenant $Tenant
     }
 }

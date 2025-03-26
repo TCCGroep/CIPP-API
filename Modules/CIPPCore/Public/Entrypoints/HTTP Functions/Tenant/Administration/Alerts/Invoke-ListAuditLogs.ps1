@@ -75,7 +75,7 @@ function Invoke-ListAuditLogs {
     }
 
     $Body = @{
-        Results  = @($AuditLogs | Sort-Object -Property Timestamp -Descending)
+        Results  = @($AuditLogs)
         Metadata = @{
             Count  = $AuditLogs.Count
             Filter = $Table.Filter ?? ''

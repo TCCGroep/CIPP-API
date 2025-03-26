@@ -3,7 +3,7 @@ using namespace System.Net
 Function Invoke-ExecSAMSetup {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         CIPP.AppSettings.ReadWrite
     #>
@@ -51,9 +51,7 @@ Function Invoke-ExecSAMSetup {
     } else {
         if ($env:MSI_SECRET) {
             Disable-AzContextAutosave -Scope Process | Out-Null
-            $null = Connect-AzAccount -Identity
-            $SubscriptionId = $ENV:WEBSITE_OWNER_NAME -split '\+' | Select-Object -First 1
-            $null = Set-AzContext -SubscriptionId $SubscriptionId
+            $AzSession = Connect-AzAccount -Identity
         }
     }
     if (!$ENV:SetFromProfile) {

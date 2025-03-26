@@ -1,4 +1,4 @@
-function Invoke-CIPPStandardTeamsExternalFileSharing {
+Function Invoke-CIPPStandardTeamsExternalFileSharing {
     <#
     .FUNCTIONALITY
         Internal
@@ -35,8 +35,9 @@ function Invoke-CIPPStandardTeamsExternalFileSharing {
 
     param($Tenant, $Settings)
     ##$Rerun -Type Standard -Tenant $Tenant -Settings $Settings 'TeamsExternalFileSharing'
-    Write-Host "TeamsExternalFileSharing: $($Settings | ConvertTo-Json)"
-    $CurrentState = New-TeamsRequest -TenantFilter $Tenant -Cmdlet 'Get-CsTeamsClientConfiguration' | Select-Object AllowGoogleDrive, AllowShareFile, AllowBox, AllowDropBox, AllowEgnyte
+
+    $CurrentState = New-TeamsRequest -TenantFilter $Tenant -Cmdlet 'Get-CsTeamsClientConfiguration'
+    | Select-Object AllowGoogleDrive, AllowShareFile, AllowBox, AllowDropBox, AllowEgnyte
 
     if ($null -eq $Settings.AllowGoogleDrive) { $Settings.AllowGoogleDrive = $false }
     if ($null -eq $Settings.AllowShareFile) { $Settings.AllowShareFile = $false }
@@ -45,10 +46,10 @@ function Invoke-CIPPStandardTeamsExternalFileSharing {
     if ($null -eq $Settings.AllowEgnyte) { $Settings.AllowEgnyte = $false }
 
     $StateIsCorrect = ($CurrentState.AllowGoogleDrive -eq $Settings.AllowGoogleDrive) -and
-    ($CurrentState.AllowShareFile -eq $Settings.AllowShareFile) -and
-    ($CurrentState.AllowBox -eq $Settings.AllowBox) -and
-    ($CurrentState.AllowDropBox -eq $Settings.AllowDropBox) -and
-    ($CurrentState.AllowEgnyte -eq $Settings.AllowEgnyte)
+                      ($CurrentState.AllowShareFile -eq $Settings.AllowShareFile) -and
+                      ($CurrentState.AllowBox -eq $Settings.AllowBox) -and
+                      ($CurrentState.AllowDropBox -eq $Settings.AllowDropBox) -and
+                      ($CurrentState.AllowEgnyte -eq $Settings.AllowEgnyte)
 
     if ($Settings.remediate -eq $true) {
         if ($StateIsCorrect -eq $true) {
@@ -76,19 +77,11 @@ function Invoke-CIPPStandardTeamsExternalFileSharing {
         if ($StateIsCorrect -eq $true) {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Teams External File Sharing is set correctly.' -sev Info
         } else {
-            Write-StandardsAlert -message 'Teams External File Sharing is not set correctly.' -object $CurrentState -tenant $Tenant -standardName 'TeamsExternalFileSharing' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Teams External File Sharing is not set correctly.' -sev Info
+            Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Teams External File Sharing is not set correctly.' -sev Alert
         }
     }
 
     if ($Setings.report -eq $true) {
         Add-CIPPBPAField -FieldName 'TeamsExternalFileSharing' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $Tenant
-
-        if ($StateIsCorrect) {
-            $FieldValue = $true
-        } else {
-            $FieldValue = $CurrentState
-        }
-        Set-CIPPStandardsCompareField -FieldName 'standards.TeamsExternalFileSharing' -FieldValue $FieldValue -Tenant $Tenant
     }
 }

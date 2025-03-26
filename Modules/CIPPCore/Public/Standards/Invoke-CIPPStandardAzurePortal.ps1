@@ -4,7 +4,7 @@ function Invoke-CIPPStandardAzurePortal {
     Internal
     #>
     param($Tenant, $Settings)
-    
-    # This standard is deprecated and no longer functional
-    return $true
+    If ($Settings.remediate -eq $true) {
+        Write-LogMessage -API 'Standards' -tenant $tenant -message 'Azure Portal disablement is no longer functional. Please remove this standard.' -sev Error
+    }
 }

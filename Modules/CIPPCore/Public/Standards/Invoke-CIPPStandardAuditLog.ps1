@@ -69,14 +69,12 @@ function Invoke-CIPPStandardAuditLog {
         if ($AuditLogEnabled -eq $true) {
             Write-LogMessage -API 'Standards' -tenant $tenant -message 'Unified Audit Log is enabled' -sev Info
         } else {
-            Write-StandardsAlert -message 'Unified Audit Log is not enabled' -object @{AuditLogEnabled = $AuditLogEnabled } -tenant $Tenant -standardName 'AuditLog' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $tenant -message 'Unified Audit Log is not enabled' -sev Info
+            Write-LogMessage -API 'Standards' -tenant $tenant -message 'Unified Audit Log is not enabled' -sev Alert
         }
     }
 
     if ($Settings.report -eq $true) {
-        $state = $AuditLogEnabled -eq $true ? $true : $AuditLogEnabled
-        Set-CIPPStandardsCompareField -FieldName 'standards.AuditLog' -FieldValue $state -TenantFilter $Tenant
+
         Add-CIPPBPAField -FieldName 'AuditLog' -FieldValue $AuditLogEnabled -StoreAs bool -Tenant $tenant
     }
 }

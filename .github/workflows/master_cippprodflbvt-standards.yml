@@ -27,4 +27,4 @@ jobs:
           app-name: 'cippprodflbvt-standards'
           slot-name: 'Production'
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B706898CB38C4C37BA22A82E6CDF587D }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_642CCAAC820047E4BC7D4A35022936A7 }}

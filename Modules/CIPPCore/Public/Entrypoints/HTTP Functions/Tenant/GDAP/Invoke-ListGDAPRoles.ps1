@@ -3,7 +3,7 @@ using namespace System.Net
 Function Invoke-ListGDAPRoles {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         Tenant.Relationship.Read
     #>

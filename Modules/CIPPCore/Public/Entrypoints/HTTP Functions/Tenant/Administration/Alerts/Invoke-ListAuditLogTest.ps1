@@ -1,7 +1,7 @@
 function Invoke-ListAuditLogTest {
     <#
     .FUNCTIONALITY
-    Entrypoint,AnyTenant
+    Entrypoint
 
     .ROLE
     Tenant.Alert.Read

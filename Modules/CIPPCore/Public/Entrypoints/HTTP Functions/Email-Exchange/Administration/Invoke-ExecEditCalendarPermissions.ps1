@@ -1,6 +1,6 @@
 using namespace System.Net
 
-function Invoke-ExecEditCalendarPermissions {
+Function Invoke-ExecEditCalendarPermissions {
     <#
     .FUNCTIONALITY
         Entrypoint
@@ -11,34 +11,30 @@ function Invoke-ExecEditCalendarPermissions {
     param($Request, $TriggerMetadata)
 
     $APIName = $Request.Params.CIPPEndpoint
-    $Headers = $Request.Headers
-    Write-LogMessage -headers $Headers -API $APIName -message 'Accessed this API' -Sev 'Debug'
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
     # Extract parameters from query or body
-    $TenantFilter = $Request.Query.tenantFilter ?? $Request.Body.tenantFilter
-    $UserID = $Request.Query.userid ?? $Request.Body.userid
-    $UserToGetPermissions = $Request.Query.UserToGetPermissions ?? $Request.Body.UserToGetPermissions.value
-    $Permissions = $Request.Query.Permissions ?? $Request.Body.Permissions.value
-    $FolderName = $Request.Query.FolderName ?? $Request.Body.FolderName
-    $RemoveAccess = $Request.Query.RemoveAccess ?? $Request.Body.RemoveAccess.value
+    $TenantFilter = if ($Request.query.TenantFilter) { $Request.query.TenantFilter } else { $Request.Body.TenantFilter }
+    $UserID = if ($Request.query.UserID) { $Request.query.UserID } else { $Request.Body.UserID }
+    $UserToGetPermissions = if ($Request.query.UserToGetPermissions) { $Request.query.UserToGetPermissions } else { $Request.Body.UserToGetPermissions.value }
+    $Permissions = if ($Request.query.Permissions) { @($Request.query.Permissions) } else { @($Request.Body.Permissions.value) }
+    $FolderName = if ($Request.query.FolderName) { $Request.query.FolderName } else { $Request.Body.FolderName }
+    $RemoveAccess = if ($Request.query.RemoveAccess) { $Request.query.RemoveAccess } else { $Request.Body.RemoveAccess.value }
 
     try {
         if ($RemoveAccess) {
-            $Result = Set-CIPPCalendarPermission -Headers $Headers -UserID $UserID -FolderName $FolderName -RemoveAccess $RemoveAccess -TenantFilter $TenantFilter
+            $result = Set-CIPPCalendarPermission -UserID $UserID -FolderName $FolderName -RemoveAccess $RemoveAccess -TenantFilter $TenantFilter
         } else {
-            $Result = Set-CIPPCalendarPermission -Headers $Headers -UserID $UserID -FolderName $FolderName -TenantFilter $TenantFilter -UserToGetPermissions $UserToGetPermissions -Permissions $Permissions
+            $result = Set-CIPPCalendarPermission -UserID $UserID -FolderName $FolderName -TenantFilter $TenantFilter -UserToGetPermissions $UserToGetPermissions -Permissions $Permissions
         }
-        $StatusCode = [HttpStatusCode]::OK
     } catch {
-        $Result = $_.Exception.Message
-        $StatusCode = [HttpStatusCode]::Forbidden
-        Write-Warning "Error in ExecEditCalendarPermissions: $($_.Exception.Message)"
-        Write-Information $_.InvocationInfo.PositionMessage
+        $ErrorMessage = Get-NormalizedError -Message $_.Exception
+        $Result = $ErrorMessage
     }
 
     # Associate values to output bindings by calling 'Push-OutputBinding'.
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = $StatusCode
+            StatusCode = [HttpStatusCode]::OK
             Body       = @{Results = $Result }
         })
 }

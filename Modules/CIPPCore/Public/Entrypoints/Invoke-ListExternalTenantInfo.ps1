@@ -3,7 +3,7 @@ using namespace System.Net
 Function Invoke-ListExternalTenantInfo {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         CIPP.Core.Read
     #>

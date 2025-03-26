@@ -57,14 +57,12 @@ function Invoke-CIPPStandardDisableAppCreation {
         if ($CurrentInfo.defaultUserRolePermissions.allowedToCreateApps -eq $false) {
             Write-LogMessage -API 'Standards' -tenant $tenant -message 'Users are not allowed to create App registrations.' -sev Info
         } else {
-            Write-StandardsAlert -message 'Users are allowed to create App registrations.' -object $CurrentInfo -tenant $tenant -standardName 'DisableAppCreation' -standardId $Settings.standardId
-            Write-LogMessage -API 'Standards' -tenant $tenant -message 'Users are allowed to create App registrations.' -sev Info
+            Write-LogMessage -API 'Standards' -tenant $tenant -message 'Users are allowed to create App registrations.' -sev Alert
         }
     }
 
     if ($Settings.report -eq $true) {
         $State = -not $CurrentInfo.defaultUserRolePermissions.allowedToCreateApps
-        Set-CIPPStandardsCompareField -FieldName 'standards.DisableAppCreation' -FieldValue $State -TenantFilter $Tenant
         Add-CIPPBPAField -FieldName 'UserAppCreationDisabled' -FieldValue $State -StoreAs bool -Tenant $tenant
     }
 }

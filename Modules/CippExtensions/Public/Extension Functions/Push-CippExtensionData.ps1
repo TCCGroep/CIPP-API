@@ -14,9 +14,5 @@ function Push-CippExtensionData {
                 Invoke-HuduExtensionSync -Configuration $Config -TenantFilter $TenantFilter
             }
         }
-        'CustomData' {
-            Write-Host 'Perfoming Custom Data Extension Sync...'
-            Invoke-CustomDataSync -TenantFilter $TenantFilter
-        }
     }
 }

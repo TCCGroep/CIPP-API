@@ -4,8 +4,6 @@ Function Invoke-PublicPhishingCheck {
     <#
     .FUNCTIONALITY
         Entrypoint
-    .ROLE
-        Public
     #>
     [CmdletBinding()]
 

@@ -3,7 +3,7 @@ using namespace System.Net
 Function Invoke-AddStandardsDeploy {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         Tenant.Standards.ReadWrite
     #>

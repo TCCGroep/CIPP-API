@@ -3,7 +3,7 @@ using namespace System.Net
 Function Invoke-AddExConnectorTemplate {
     <#
     .FUNCTIONALITY
-        Entrypoint,AnyTenant
+        Entrypoint
     .ROLE
         Exchange.Connector.ReadWrite
     #>

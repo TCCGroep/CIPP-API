@@ -5,7 +5,7 @@ Function Invoke-ExecModifyCalPerms {
     .FUNCTIONALITY
         Entrypoint
     .ROLE
-        Exchange.Calendar.ReadWrite
+        Exchange.Mailbox.ReadWrite
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)

@@ -1,6 +1,6 @@
 using namespace System.Net
 
-Function Invoke-ExecBECRemediate {
+function Invoke-ExecBECRemediate {
     <#
     .FUNCTIONALITY
         Entrypoint
@@ -35,11 +35,10 @@ Function Invoke-ExecBECRemediate {
         if (($Rules | Measure-Object).Count -gt 0) {
             $Rules | Where-Object { $_.Name -ne 'Junk E-Mail Rule' -and $_.Name -notlike 'Microsoft.Exchange.OOF.*' } | ForEach-Object {
                 try {
-                    $null = New-ExoRequest -anchor $Username -tenantid $TenantFilter -cmdlet 'Disable-InboxRule' -cmdParams @{Confirm = $false; Identity = $_.Identity }
-                    "Disabled Inbox Rule '$($_.Identity)' for $Username"
+                    Set-CIPPMailboxRule -Username $Username -TenantFilter $TenantFilter -RuleId $_.Identity -RuleName $_.Name -Disable -APIName $APIName -Headers $Headers
                     $RuleDisabled++
                 } catch {
-                    "Failed to disable Inbox Rule '$($_.Identity)' for $Username"
+                    $_.Exception.Message
                     $RuleFailed++
                 }
             }
@@ -54,7 +53,7 @@ Function Invoke-ExecBECRemediate {
             "Failed to disable $RuleFailed Inbox Rules for $Username"
         }
         $StatusCode = [HttpStatusCode]::OK
-        Write-LogMessage -API 'BECRemediate' -tenant $TenantFilter -message "Executed Remediation for $Username" -sev 'Info'
+        Write-LogMessage -API 'BECRemediate' -tenant $TenantFilter -message "Executed Remediation for $Username" -sev 'Info' -LogData @($Results)
 
     } catch {
         $ErrorMessage = Get-CippException -Exception $_

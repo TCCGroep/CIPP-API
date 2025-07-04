@@ -32,34 +32,38 @@ function Invoke-CIPPStandardSPDirectSharing {
 
     param($Tenant, $Settings)
 
+    Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'This standard has been deprecated in favor of the "Set Default Sharing Link Settings" standard. Please update your standards to use new standard. However this will continue to function.' -Sev Alert
+
     $CurrentState = Get-CIPPSPOTenant -TenantFilter $Tenant |
-        Select-Object -Property DefaultSharingLinkType
+        Select-Object -Property _ObjectIdentity_, TenantFilter, DefaultSharingLinkType
 
     $StateIsCorrect = ($CurrentState.DefaultSharingLinkType -eq 'Direct' -or $CurrentState.DefaultSharingLinkType -eq 1)
 
     if ($Settings.remediate -eq $true) {
         if ($StateIsCorrect -eq $true) {
-            Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'SharePoint Sharing Restriction is already enabled' -Sev Info
+            Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'SharePoint Default Direct Sharing is already enabled' -Sev Info
         } else {
             $Properties = @{
                 DefaultSharingLinkType = 1
             }
 
             try {
-                Get-CIPPSPOTenant -TenantFilter $Tenant | Set-CIPPSPOTenant -Properties $Properties
-                Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'Successfully set the SharePoint Sharing Restriction to Direct' -Sev Info
+                $CurrentState | Set-CIPPSPOTenant -Properties $Properties
+                Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'Successfully set the SharePoint Default Direct Sharing to Direct' -Sev Info
             } catch {
                 $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
-                Write-LogMessage -API 'Standards' -Tenant $Tenant -Message "Failed to set the SharePoint Sharing Restriction to Direct. Error: $ErrorMessage" -Sev Error
+                Write-LogMessage -API 'Standards' -Tenant $Tenant -Message "Failed to set the SharePoint Default Direct Sharing to Direct. Error: $ErrorMessage" -Sev Error
             }
         }
     }
 
     if ($Settings.alert -eq $true) {
         if ($StateIsCorrect -eq $true) {
-            Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'SharePoint Sharing Restriction is enabled' -Sev Info
+            Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'SharePoint Direct Sharing is enabled' -Sev Info
         } else {
-            Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'SharePoint Sharing Restriction is not enabled' -Sev Alert
+            $Message = 'SharePoint Default Direct Sharing is not enabled.'
+            Write-StandardsAlert -message $Message -object $CurrentState -tenant $Tenant -standardName 'SPDirectSharing' -standardId $Settings.standardId
+            Write-LogMessage -API 'Standards' -Tenant $Tenant -Message $Message -Sev Alert
         }
     }
 

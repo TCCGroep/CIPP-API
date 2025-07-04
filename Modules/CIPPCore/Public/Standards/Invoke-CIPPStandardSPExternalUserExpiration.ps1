@@ -33,7 +33,7 @@ function Invoke-CIPPStandardSPExternalUserExpiration {
     param($Tenant, $Settings)
 
     $CurrentState = Get-CIPPSPOTenant -TenantFilter $Tenant |
-    Select-Object -Property ExternalUserExpireInDays, ExternalUserExpirationRequired
+        Select-Object -Property _ObjectIdentity_, TenantFilter, ExternalUserExpireInDays, ExternalUserExpirationRequired
 
     $StateIsCorrect = ($CurrentState.ExternalUserExpireInDays -eq $Settings.Days) -and
     ($CurrentState.ExternalUserExpirationRequired -eq $true)
@@ -48,7 +48,7 @@ function Invoke-CIPPStandardSPExternalUserExpiration {
             }
 
             try {
-                Get-CIPPSPOTenant -TenantFilter $Tenant | Set-CIPPSPOTenant -Properties $Properties
+                $CurrentState | Set-CIPPSPOTenant -Properties $Properties
                 Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'Successfully set External User Expiration' -Sev Info
             } catch {
                 $ErrorMessage = Get-CippException -Exception $_
@@ -61,7 +61,9 @@ function Invoke-CIPPStandardSPExternalUserExpiration {
         if ($StateIsCorrect -eq $true) {
             Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'External User Expiration is enabled' -Sev Info
         } else {
-            Write-LogMessage -API 'Standards' -Tenant $Tenant -Message 'External User Expiration is not enabled' -Sev Alert
+            $Message = 'External User Expiration is not set to the desired value.'
+            Write-StandardsAlert -message $Message -object $CurrentState -tenant $Tenant -standardName 'SPExternalUserExpiration' -standardId $Settings.standardId
+            Write-LogMessage -API 'Standards' -Tenant $Tenant -Message $Message -Sev Alert
         }
     }
 

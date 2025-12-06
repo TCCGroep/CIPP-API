@@ -13,6 +13,8 @@ function Invoke-CIPPStandardExcludedfileExt {
         CAT
             SharePoint Standards
         TAG
+        EXECUTIVETEXT
+            Blocks specific file types from being uploaded or synchronized to OneDrive, helping prevent security risks from potentially dangerous file formats. This security measure protects against malware distribution while allowing legitimate business file types to be shared safely.
         ADDEDCOMPONENT
             {"type":"textField","name":"standards.ExcludedfileExt.ext","label":"Extensions, Comma separated"}
         IMPACT
@@ -29,9 +31,22 @@ function Invoke-CIPPStandardExcludedfileExt {
     #>
 
     param($Tenant, $Settings)
+    $TestResult = Test-CIPPStandardLicense -StandardName 'ExcludedfileExt' -TenantFilter $Tenant -RequiredCapabilities @('SHAREPOINTWAC', 'SHAREPOINTSTANDARD', 'SHAREPOINTENTERPRISE', 'SHAREPOINTENTERPRISE_EDU','ONEDRIVE_BASIC', 'ONEDRIVE_ENTERPRISE')
     ##$Rerun -Type Standard -Tenant $Tenant -Settings $Settings 'ExcludedfileExt'
 
-    $CurrentInfo = New-GraphGetRequest -Uri 'https://graph.microsoft.com/beta/admin/sharepoint/settings' -tenantid $Tenant -AsApp $true
+    if ($TestResult -eq $false) {
+        Write-Host "We're exiting as the correct license is not present for this standard."
+        return $true
+    } #we're done.
+
+    try {
+        $CurrentInfo = New-GraphGetRequest -Uri 'https://graph.microsoft.com/beta/admin/sharepoint/settings' -tenantid $Tenant -AsApp $true
+    }
+    catch {
+        $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
+        Write-LogMessage -API 'Standards' -Tenant $Tenant -Message "Could not get the ExcludedfileExt state for $Tenant. Error: $ErrorMessage" -Sev Error
+        return
+    }
     $Exts = ($Settings.ext -replace ' ', '') -split ','
     # Add a wildcard to the extensions since thats what the SP admin center does
     $Exts = $Exts | ForEach-Object { if ($_ -notlike '*.*') { "*.$_" } else { $_ } }
@@ -69,6 +84,7 @@ function Invoke-CIPPStandardExcludedfileExt {
     if ($Settings.alert -eq $true) {
 
         if ($MissingExclusions) {
+            Write-StandardsAlert -message 'Exclude File Extensions from Syncing missing some extensions.' -object $MissingExclusions -tenant $Tenant -standardName 'ExcludedfileExt' -standardId $Settings.standardId
             Write-LogMessage -API 'Standards' -tenant $tenant -message "Excluded synced files does not contain $($MissingExclusions -join ',')" -sev Alert
         } else {
             Write-LogMessage -API 'Standards' -tenant $tenant -message "Excluded synced files contains $($Settings.ext)" -sev Info

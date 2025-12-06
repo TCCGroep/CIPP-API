@@ -13,7 +13,9 @@ function Invoke-CIPPStandardAddDKIM {
         CAT
             Exchange Standards
         TAG
-            "CIS"
+            "CIS M365 5.0 (2.1.9)"
+        EXECUTIVETEXT
+            Enables email authentication technology that digitally signs outgoing emails to verify they actually came from your organization. This prevents email spoofing, improves email deliverability, and protects the company's reputation by ensuring recipients can trust emails from your domains.
         ADDEDCOMPONENT
         IMPACT
             Low Impact
@@ -32,7 +34,12 @@ function Invoke-CIPPStandardAddDKIM {
 
     param($Tenant, $Settings)
     #$Rerun -Type Standard -Tenant $Tenant -API 'AddDKIM' -Settings $Settings
+    $TestResult = Test-CIPPStandardLicense -StandardName 'AddDKIM' -TenantFilter $Tenant -RequiredCapabilities @('EXCHANGE_S_STANDARD', 'EXCHANGE_S_ENTERPRISE', 'EXCHANGE_S_STANDARD_GOV', 'EXCHANGE_S_ENTERPRISE_GOV', 'EXCHANGE_LITE') #No Foundation because that does not allow powershell access
 
+    if ($TestResult -eq $false) {
+        Write-Host "We're exiting as the correct license is not present for this standard."
+        return $true
+    } #we're done.
 
     $DkimRequest = @(
         @{
@@ -69,6 +76,7 @@ function Invoke-CIPPStandardAddDKIM {
     # Same exclusions also found in Push-DomainAnalyserTenant
     $ExclusionDomains = @(
         '*.microsoftonline.com'
+        '*.mail.onmicrosoft.com'
         '*.exclaimer.cloud'
         '*.excl.cloud'
         '*.codetwo.online'
@@ -76,6 +84,9 @@ function Invoke-CIPPStandardAddDKIM {
         '*.signature365.net'
         '*.myteamsconnect.io'
         '*.teams.dstny.com'
+        '*.msteams.8x8.com'
+        '*.ucconnect.co.uk'
+        '*.teams-sbc.dk'
     )
 
     $AllDomains = ($BatchResults | Where-Object { $_.DomainName }).DomainName | ForEach-Object {
@@ -101,7 +112,7 @@ function Invoke-CIPPStandardAddDKIM {
     $NewDomains = $AllDomains | Where-Object { $DKIM.Domain -notcontains $_ }
     $SetDomains = $DKIM | Where-Object { $AllDomains -contains $_.Domain -and $_.Enabled -eq $false }
 
-    If ($Settings.remediate -eq $true) {
+    if ($Settings.remediate -eq $true) {
 
         if ($null -eq $NewDomains -and $null -eq $SetDomains) {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message 'DKIM is already enabled for all available domains.' -sev Info

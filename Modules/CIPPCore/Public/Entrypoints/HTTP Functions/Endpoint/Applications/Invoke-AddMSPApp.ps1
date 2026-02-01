@@ -1,5 +1,3 @@
-using namespace System.Net
-
 function Invoke-AddMSPApp {
     <#
     .FUNCTIONALITY
@@ -12,10 +10,10 @@ function Invoke-AddMSPApp {
 
     $APIName = $Request.Params.CIPPEndpoint
     $Headers = $Request.Headers
-    Write-LogMessage -headers $Headers -API $APIName -message 'Accessed this API' -Sev 'Debug'
+
 
     $RMMApp = $Request.Body
-    $AssignTo = $Request.Body.AssignTo
+    $AssignTo = $Request.Body.AssignTo -eq 'customGroup' ? $Request.Body.CustomGroup : $Request.Body.AssignTo
     $intuneBody = Get-Content "AddMSPApp\$($RMMApp.RMMName.value).app.json" | ConvertFrom-Json
     $intuneBody.displayName = $RMMApp.DisplayName
 
@@ -87,8 +85,7 @@ function Invoke-AddMSPApp {
 
 
     $body = [PSCustomObject]@{'Results' = $Results }
-    # Associate values to output bindings by calling 'Push-OutputBinding'.
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = $body
         })

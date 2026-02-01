@@ -13,6 +13,8 @@ function Invoke-CIPPStandardUserSubmissions {
         CAT
             Exchange Standards
         TAG
+        EXECUTIVETEXT
+            Enables employees to easily report suspicious emails directly from Outlook, helping improve the organization's spam and phishing detection systems. This crowdsourced approach to security allows users to contribute to threat detection while providing valuable feedback to enhance email security filters.
         ADDEDCOMPONENT
             {"type":"autoComplete","multiple":false,"label":"Select value","name":"standards.UserSubmissions.state","options":[{"label":"Enabled","value":"enable"},{"label":"Disabled","value":"disable"}]}
             {"type":"textField","name":"standards.UserSubmissions.email","required":false,"label":"Destination email address"}
@@ -30,7 +32,11 @@ function Invoke-CIPPStandardUserSubmissions {
     #>
 
     param($Tenant, $Settings)
-    ##$Rerun -Type Standard -Tenant $Tenant -Settings $Settings 'UserSubmissions'
+    $TestResult = Test-CIPPStandardLicense -StandardName 'UserSubmissions' -TenantFilter $Tenant -RequiredCapabilities @('EXCHANGE_S_STANDARD', 'EXCHANGE_S_ENTERPRISE', 'EXCHANGE_S_STANDARD_GOV', 'EXCHANGE_S_ENTERPRISE_GOV', 'EXCHANGE_LITE') #No Foundation because that does not allow powershell access
+
+    if ($TestResult -eq $false) {
+        return $true
+    } #we're done.
 
     # Get state value using null-coalescing operator
     $state = $Settings.state.value ?? $Settings.state
@@ -51,8 +57,13 @@ function Invoke-CIPPStandardUserSubmissions {
         }
     }
 
-    $PolicyState = New-ExoRequest -tenantid $Tenant -cmdlet 'Get-ReportSubmissionPolicy'
-    $RuleState = New-ExoRequest -tenantid $Tenant -cmdlet 'Get-ReportSubmissionRule'
+    try {
+        $PolicyState = New-ExoRequest -tenantid $Tenant -cmdlet 'Get-ReportSubmissionPolicy'
+        $RuleState = New-ExoRequest -tenantid $Tenant -cmdlet 'Get-ReportSubmissionRule'
+    } catch {
+        $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
+        Write-LogMessage -API 'Standards' -Tenant $Tenant -Message "Could not get the UserSubmissions state for $Tenant. Error: $ErrorMessage" -Sev Error
+    }
 
     if ($state -eq 'enable') {
         if (([string]::IsNullOrWhiteSpace($Email))) {
@@ -185,7 +196,6 @@ function Invoke-CIPPStandardUserSubmissions {
         }
     }
 
-
     if ($Settings.report -eq $true) {
         if ($PolicyState.length -eq 0) {
             Add-CIPPBPAField -FieldName 'UserSubmissionPolicy' -FieldValue $false -StoreAs bool -Tenant $Tenant
@@ -193,14 +203,42 @@ function Invoke-CIPPStandardUserSubmissions {
             Add-CIPPBPAField -FieldName 'UserSubmissionPolicy' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $Tenant
         }
 
-        if ($StateIsCorrect) {
-            $FieldValue = $true
-        } else {
-            $PolicyState = $PolicyState | Select-Object EnableReportToMicrosoft, ReportJunkToCustomizedAddress, ReportNotJunkToCustomizedAddress, ReportPhishToCustomizedAddress, ReportJunkAddresses, ReportNotJunkAddresses, ReportPhishAddresses
-            $RuleState = $RuleState | Select-Object State, SentTo
-            $FieldValue = @{ PolicyState = $PolicyState; RuleState = $RuleState }
-        }
+        $PolicyState = $PolicyState | Select-Object EnableReportToMicrosoft, ReportJunkToCustomizedAddress, ReportNotJunkToCustomizedAddress, ReportPhishToCustomizedAddress, ReportJunkAddresses, ReportNotJunkAddresses, ReportPhishAddresses
+        $RuleState = $RuleState | Select-Object State, SentTo
 
-        Set-CIPPStandardsCompareField -FieldName 'standards.UserSubmissions' -FieldValue $FieldValue -TenantFilter $Tenant
+        $CurrentValue = @{
+            EnableReportToMicrosoft          = $PolicyState.EnableReportToMicrosoft
+            ReportJunkToCustomizedAddress    = $PolicyState.ReportJunkToCustomizedAddress
+            ReportNotJunkToCustomizedAddress = $PolicyState.ReportNotJunkToCustomizedAddress
+            ReportPhishToCustomizedAddress   = $PolicyState.ReportPhishToCustomizedAddress
+            ReportJunkAddresses              = $PolicyState.ReportJunkAddresses
+            ReportNotJunkAddresses           = $PolicyState.ReportNotJunkAddresses
+            ReportPhishAddresses             = $PolicyState.ReportPhishAddresses
+            RuleState                        = @{
+                State  = $RuleState.State
+                SentTo = $RuleState.SentTo
+            }
+        }
+        $ExpectedValue = @{
+            EnableReportToMicrosoft          = $state -eq 'enable'
+            ReportJunkToCustomizedAddress    = if ([string]::IsNullOrWhiteSpace($Email)) { $false } else { $true }
+            ReportNotJunkToCustomizedAddress = if ([string]::IsNullOrWhiteSpace($Email)) { $false } else { $true }
+            ReportPhishToCustomizedAddress   = if ([string]::IsNullOrWhiteSpace($Email)) { $false } else { $true }
+            ReportJunkAddresses              = if ([string]::IsNullOrWhiteSpace($Email)) { $null } else { @($Email) }
+            ReportNotJunkAddresses           = if ([string]::IsNullOrWhiteSpace($Email)) { $null } else { @($Email) }
+            ReportPhishAddresses             = if ([string]::IsNullOrWhiteSpace($Email)) { $null } else { @($Email) }
+            RuleState                        = if ([string]::IsNullOrWhiteSpace($Email)) {
+                @{
+                    State  = 'Disabled'
+                    SentTo = $null
+                }
+            } else {
+                @{
+                    State  = 'Enabled'
+                    SentTo = @($Email)
+                }
+            }
+        }
+        Set-CIPPStandardsCompareField -FieldName 'standards.UserSubmissions' -CurrentValue $CurrentValue -ExpectedValue $ExpectedValue -TenantFilter $Tenant
     }
 }

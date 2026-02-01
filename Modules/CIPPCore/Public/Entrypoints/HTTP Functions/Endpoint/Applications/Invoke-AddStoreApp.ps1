@@ -1,6 +1,4 @@
-using namespace System.Net
-
-Function Invoke-AddStoreApp {
+function Invoke-AddStoreApp {
     <#
     .FUNCTIONALITY
         Entrypoint
@@ -12,10 +10,10 @@ Function Invoke-AddStoreApp {
 
     $APIName = $Request.Params.CIPPEndpoint
     $Headers = $Request.Headers
-    Write-LogMessage -headers $Headers -API $APIName -message 'Accessed this API' -Sev 'Debug'
+
 
     $WinGetApp = $Request.Body
-    $assignTo = $Request.body.AssignTo
+    $assignTo = $Request.Body.AssignTo -eq 'customGroup' ? $Request.Body.CustomGroup : $Request.Body.AssignTo
 
     if ($ChocoApp.InstallAsSystem) { 'system' } else { 'user' }
     $WinGetData = [ordered]@{
@@ -58,8 +56,7 @@ Function Invoke-AddStoreApp {
 
     $body = [pscustomobject]@{'Results' = $Results }
 
-    # Associate values to output bindings by calling 'Push-OutputBinding'.
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = $body
         })

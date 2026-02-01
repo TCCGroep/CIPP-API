@@ -1,5 +1,3 @@
-using namespace System.Net
-
 function Invoke-AddScheduledItem {
     <#
     .FUNCTIONALITY
@@ -14,6 +12,8 @@ function Invoke-AddScheduledItem {
     } else {
         $hidden = $true
     }
+
+    $DisallowDuplicateName = $Request.Query.DisallowDuplicateName ?? $Request.Body.DisallowDuplicateName
 
     if ($Request.Body.RunNow -eq $true) {
         try {
@@ -31,10 +31,16 @@ function Invoke-AddScheduledItem {
             $Result = "Error scheduling task: $($_.Exception.Message)"
         }
     } else {
-        $Result = Add-CIPPScheduledTask -Task $Request.Body -Headers $Request.Headers -hidden $hidden -DisallowDuplicateName $Request.Query.DisallowDuplicateName
-        Write-LogMessage -headers $Request.Headers -API $APINAME -message $Result -Sev 'Info'
+        $ScheduledTask = @{
+            Task                  = $Request.Body
+            Headers               = $Request.Headers
+            Hidden                = $hidden
+            DisallowDuplicateName = $DisallowDuplicateName
+            DesiredStartTime      = $Request.Body.DesiredStartTime
+        }
+        $Result = Add-CIPPScheduledTask @ScheduledTask
     }
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = @{ Results = $Result }
         })

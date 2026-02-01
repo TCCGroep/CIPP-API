@@ -28,6 +28,9 @@ function Compare-CIPPIntuneObject {
             'qualityUpdatesWillBeRolledBack',
             'qualityUpdatesPauseStartDate',
             'featureUpdatesPauseStartDate'
+            'wslDistributions',
+            'lastSuccessfulSyncDateTime',
+            'tenantFilter'
         )
 
         $excludeProps = $defaultExcludeProperties + $ExcludeProperties
@@ -88,7 +91,7 @@ function Compare-CIPPIntuneObject {
             }
 
             # Short-circuit recursion for primitive types
-            $primitiveTypes = @([double], [decimal], [datetime], [timespan], [guid] )
+            $primitiveTypes = @([string], [int], [long], [bool], [double], [decimal], [datetime], [timespan], [guid] )
             foreach ($type in $primitiveTypes) {
                 if ($Object1 -is $type -and $Object2 -is $type) {
                     if ($Object1 -ne $Object2) {
@@ -151,34 +154,78 @@ function Compare-CIPPIntuneObject {
                     }
                 }
             } elseif ($Object1 -is [PSCustomObject] -or $Object1.PSObject.Properties.Count -gt 0) {
-                $allPropertyNames = @(
-                    $Object1.PSObject.Properties | Select-Object -ExpandProperty Name
-                    $Object2.PSObject.Properties | Select-Object -ExpandProperty Name
-                ) | Select-Object -Unique
+                # Skip comparison if either object is an array - arrays can't have custom properties set
+                $isObj1Array = $Object1 -is [Array] -or $Object1 -is [System.Collections.IList]
+                $isObj2Array = $Object2 -is [Array] -or $Object2 -is [System.Collections.IList]
+                if ($isObj1Array -or $isObj2Array) {
+                    return
+                }
+
+                # Safely get property names - ensure objects are not arrays before accessing PSObject.Properties
+                $allPropertyNames = @()
+                try {
+                    if (-not ($Object1 -is [Array] -or $Object1 -is [System.Collections.IList])) {
+                        $allPropertyNames += $Object1.PSObject.Properties | Select-Object -ExpandProperty Name
+                    }
+                    if (-not ($Object2 -is [Array] -or $Object2 -is [System.Collections.IList])) {
+                        $allPropertyNames += $Object2.PSObject.Properties | Select-Object -ExpandProperty Name
+                    }
+                    $allPropertyNames = $allPropertyNames | Select-Object -Unique
+                } catch {
+                    return
+                }
 
                 foreach ($propName in $allPropertyNames) {
                     if (ShouldSkipProperty -PropertyName $propName) { continue }
 
                     $newPath = if ($PropertyPath) { "$PropertyPath.$propName" } else { $propName }
-                    $prop1Exists = $Object1.PSObject.Properties.Name -contains $propName
-                    $prop2Exists = $Object2.PSObject.Properties.Name -contains $propName
+                    # Safely check if properties exist - ensure objects are not arrays
+                    $prop1Exists = $false
+                    $prop2Exists = $false
+                    try {
+                        if (-not ($Object1 -is [Array] -or $Object1 -is [System.Collections.IList])) {
+                            $prop1Exists = $Object1.PSObject.Properties.Name -contains $propName
+                        }
+                        if (-not ($Object2 -is [Array] -or $Object2 -is [System.Collections.IList])) {
+                            $prop2Exists = $Object2.PSObject.Properties.Name -contains $propName
+                        }
+                    } catch {
+                        continue
+                    }
 
                     if ($prop1Exists -and $prop2Exists) {
-                        if ($Object1.$propName -and $Object2.$propName) {
-                            Compare-ObjectsRecursively -Object1 $Object1.$propName -Object2 $Object2.$propName -PropertyPath $newPath -Depth ($Depth + 1) -MaxDepth $MaxDepth
+                        try {
+                            # Double-check arrays before accessing properties
+                            if (($Object1 -is [Array] -or $Object1 -is [System.Collections.IList]) -or
+                                ($Object2 -is [Array] -or $Object2 -is [System.Collections.IList])) {
+                                continue
+                            }
+                            if ($Object1.$propName -and $Object2.$propName) {
+                                Compare-ObjectsRecursively -Object1 $Object1.$propName -Object2 $Object2.$propName -PropertyPath $newPath -Depth ($Depth + 1) -MaxDepth $MaxDepth
+                            }
+                        } catch {
+                            throw
                         }
                     } elseif ($prop1Exists) {
-                        $result.Add([PSCustomObject]@{
-                                Property      = $newPath
-                                ExpectedValue = $Object1.$propName
-                                ReceivedValue = ''
-                            })
+                        try {
+                            $result.Add([PSCustomObject]@{
+                                    Property      = $newPath
+                                    ExpectedValue = $Object1.$propName
+                                    ReceivedValue = ''
+                                })
+                        } catch {
+                            throw
+                        }
                     } else {
-                        $result.Add([PSCustomObject]@{
-                                Property      = $newPath
-                                ExpectedValue = ''
-                                ReceivedValue = $Object2.$propName
-                            })
+                        try {
+                            $result.Add([PSCustomObject]@{
+                                    Property      = $newPath
+                                    ExpectedValue = ''
+                                    ReceivedValue = $Object2.$propName
+                                })
+                        } catch {
+                            throw
+                        }
                     }
                 }
             } else {
@@ -217,6 +264,126 @@ function Compare-CIPPIntuneObject {
     } else {
         $intuneCollection = Get-Content .\intuneCollection.json | ConvertFrom-Json -ErrorAction SilentlyContinue
 
+        # Recursive function to process group setting collections at any depth
+        function Process-GroupSettingChildren {
+            param(
+                [Parameter(Mandatory = $true)]
+                $Children,
+                [Parameter(Mandatory = $true)]
+                [string]$Source,
+                [Parameter(Mandatory = $true)]
+                $IntuneCollection
+            )
+
+            $results = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+            foreach ($child in $Children) {
+                $childIntuneObj = $IntuneCollection | Where-Object { $_.id -eq $child.settingDefinitionId }
+                $childLabel = if ($childIntuneObj?.displayName) {
+                    $childIntuneObj.displayName
+                } else {
+                    $child.settingDefinitionId
+                }
+
+                switch ($child.'@odata.type') {
+                    '#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance' {
+                        if ($child.groupSettingCollectionValue) {
+                            foreach ($groupValue in $child.groupSettingCollectionValue) {
+                                if ($groupValue.children) {
+                                    $nestedResults = Process-GroupSettingChildren -Children $groupValue.children -Source $Source -IntuneCollection $IntuneCollection
+                                    $results.AddRange($nestedResults)
+                                }
+                            }
+                        }
+                    }
+                    '#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance' {
+                        $childValue = $null
+                        if ($child.choiceSettingValue?.value) {
+                            $option = $childIntuneObj.options | Where-Object {
+                                $_.id -eq $child.choiceSettingValue.value
+                            }
+                            $childValue = if ($option?.displayName) {
+                                $option.displayName
+                            } else {
+                                $child.choiceSettingValue.value
+                            }
+                        }
+
+                        $results.Add([PSCustomObject]@{
+                                Key    = "GroupChild-$($child.settingDefinitionId)"
+                                Label  = $childLabel
+                                Value  = $childValue
+                                Source = $Source
+                            })
+                    }
+                    '#microsoft.graph.deviceManagementConfigurationSimpleSettingInstance' {
+                        $childValue = $null
+                        if ($null -ne $child.simpleSettingValue -and $null -ne $child.simpleSettingValue.value) {
+                            $childValue = $child.simpleSettingValue.value
+                        }
+
+                        $results.Add([PSCustomObject]@{
+                                Key    = "GroupChild-$($child.settingDefinitionId)"
+                                Label  = $childLabel
+                                Value  = $childValue
+                                Source = $Source
+                            })
+                    }
+                    '#microsoft.graph.deviceManagementConfigurationChoiceSettingCollectionInstance' {
+                        if ($child.choiceSettingCollectionValue) {
+                            $values = [System.Collections.Generic.List[string]]::new()
+                            foreach ($choiceValue in $child.choiceSettingCollectionValue) {
+                                $option = $childIntuneObj.options | Where-Object {
+                                    $_.id -eq $choiceValue.value
+                                }
+                                $displayValue = if ($option?.displayName) {
+                                    $option.displayName
+                                } else {
+                                    $choiceValue.value
+                                }
+                                $values.Add($displayValue)
+                            }
+                            $childValue = $values -join ', '
+
+                            $results.Add([PSCustomObject]@{
+                                    Key    = "GroupChild-$($child.settingDefinitionId)"
+                                    Label  = $childLabel
+                                    Value  = $childValue
+                                    Source = $Source
+                                })
+                        }
+                    }
+                    '#microsoft.graph.deviceManagementConfigurationSimpleSettingCollectionInstance' {
+                        if ($child.simpleSettingCollectionValue) {
+                            $values = [System.Collections.Generic.List[object]]::new()
+                            foreach ($simpleValue in $child.simpleSettingCollectionValue) {
+                                $values.Add($simpleValue.value)
+                            }
+                            $childValue = $values -join ', '
+
+                            $results.Add([PSCustomObject]@{
+                                    Key    = "GroupChild-$($child.settingDefinitionId)"
+                                    Label  = $childLabel
+                                    Value  = $childValue
+                                    Source = $Source
+                                })
+                        }
+                    }
+                    default {
+                        # Unknown setting type - could add logging here if needed
+                    }
+                }
+
+                # Also process any children within choice setting values
+                if ($child.choiceSettingValue?.children) {
+                    $nestedResults = Process-GroupSettingChildren -Children $child.choiceSettingValue.children -Source $Source -IntuneCollection $IntuneCollection
+                    $results.AddRange($nestedResults)
+                }
+            }
+
+            return $results
+        }
+
         # Process reference object settings
         $referenceItems = $ReferenceObject.settings | ForEach-Object {
             $settingInstance = $_.settingInstance
@@ -224,40 +391,18 @@ function Compare-CIPPIntuneObject {
             $tempOutput = switch ($settingInstance.'@odata.type') {
                 '#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance' {
                     if ($null -ne $settingInstance.groupSettingCollectionValue) {
+                        $groupResults = [System.Collections.Generic.List[PSCustomObject]]::new()
                         foreach ($groupValue in $settingInstance.groupSettingCollectionValue) {
                             if ($groupValue.children -is [System.Array]) {
-                                foreach ($child in $groupValue.children) {
-                                    $childIntuneObj = $intuneCollection | Where-Object { $_.id -eq $child.settingDefinitionId }
-                                    $childLabel = if ($childIntuneObj?.displayName) {
-                                        $childIntuneObj.displayName
-                                    } else {
-                                        $child.settingDefinitionId
-                                    }
-                                    $childValue = $null
-                                    if ($child.choiceSettingValue?.value) {
-                                        $option = $childIntuneObj.options | Where-Object {
-                                            $_.id -eq $child.choiceSettingValue.value
-                                        }
-                                        $childValue = if ($option?.displayName) {
-                                            $option.displayName
-                                        } else {
-                                            $child.choiceSettingValue.value
-                                        }
-                                    }
-
-                                    # Add object to our temporary list
-                                    [PSCustomObject]@{
-                                        Key    = "GroupChild-$($child.settingDefinitionId)"
-                                        Label  = $childLabel
-                                        Value  = $childValue
-                                        Source = 'Reference'
-                                    }
-                                }
+                                $childResults = Process-GroupSettingChildren -Children $groupValue.children -Source 'Reference' -IntuneCollection $intuneCollection
+                                $groupResults.AddRange($childResults)
                             }
                         }
+                        # Return the results from the recursive processing
+                        $groupResults
                     }
                 }
-                Default {
+                default {
                     if ($settingInstance.simpleSettingValue?.value) {
                         $label = if ($intuneObj?.displayName) {
                             $intuneObj.displayName
@@ -318,40 +463,18 @@ function Compare-CIPPIntuneObject {
             $tempOutput = switch ($settingInstance.'@odata.type') {
                 '#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance' {
                     if ($null -ne $settingInstance.groupSettingCollectionValue) {
+                        $groupResults = [System.Collections.Generic.List[PSCustomObject]]::new()
                         foreach ($groupValue in $settingInstance.groupSettingCollectionValue) {
                             if ($groupValue.children -is [System.Array]) {
-                                foreach ($child in $groupValue.children) {
-                                    $childIntuneObj = $intuneCollection | Where-Object { $_.id -eq $child.settingDefinitionId }
-                                    $childLabel = if ($childIntuneObj?.displayName) {
-                                        $childIntuneObj.displayName
-                                    } else {
-                                        $child.settingDefinitionId
-                                    }
-                                    $childValue = $null
-                                    if ($child.choiceSettingValue?.value) {
-                                        $option = $childIntuneObj.options | Where-Object {
-                                            $_.id -eq $child.choiceSettingValue.value
-                                        }
-                                        $childValue = if ($option?.displayName) {
-                                            $option.displayName
-                                        } else {
-                                            $child.choiceSettingValue.value
-                                        }
-                                    }
-
-                                    # Add object to our temporary list
-                                    [PSCustomObject]@{
-                                        Key    = "GroupChild-$($child.settingDefinitionId)"
-                                        Label  = $childLabel
-                                        Value  = $childValue
-                                        Source = 'Difference'
-                                    }
-                                }
+                                $childResults = Process-GroupSettingChildren -Children $groupValue.children -Source 'Difference' -IntuneCollection $intuneCollection
+                                $groupResults.AddRange($childResults)
                             }
                         }
+                        # Return the results from the recursive processing
+                        $groupResults
                     }
                 }
-                Default {
+                default {
                     if ($settingInstance.simpleSettingValue?.value) {
                         $label = if ($intuneObj?.displayName) {
                             $intuneObj.displayName

@@ -14,6 +14,8 @@ function Invoke-CIPPStandardOauthConsentLowSec {
             Entra (AAD) Standards
         TAG
             "IntegratedApps"
+        EXECUTIVETEXT
+            Allows employees to approve low-risk applications without administrative intervention, balancing security with productivity. This provides a middle ground between complete restriction and open access, enabling business agility while maintaining protection against high-risk applications.
         IMPACT
             Medium Impact
         ADDEDDATE
@@ -29,8 +31,16 @@ function Invoke-CIPPStandardOauthConsentLowSec {
 
     param($Tenant, $Settings)
 
-    $State = (New-GraphGetRequest -Uri 'https://graph.microsoft.com/beta/policies/authorizationPolicy/authorizationPolicy' -tenantid $tenant)
-    $PermissionState = (New-GraphGetRequest -Uri "https://graph.microsoft.com/beta/servicePrincipals(appId='00000003-0000-0000-c000-000000000000')/delegatedPermissionClassifications" -tenantid $tenant) | Select-Object -Property permissionName
+    try {
+        $State = (New-GraphGetRequest -Uri 'https://graph.microsoft.com/beta/policies/authorizationPolicy/authorizationPolicy' -tenantid $tenant)
+
+        $PermissionState = (New-GraphGetRequest -Uri "https://graph.microsoft.com/beta/servicePrincipals(appId='00000003-0000-0000-c000-000000000000')/delegatedPermissionClassifications" -tenantid $tenant) |
+            Select-Object -Property permissionName
+    } catch {
+        $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
+        Write-LogMessage -API 'Standards' -Tenant $Tenant -Message "Could not get the OauthConsentLowSec state for $Tenant. Error: $ErrorMessage" -Sev Error
+        return
+    }
 
     $requiredPermissions = @('offline_access', 'openid', 'User.Read', 'profile', 'email')
     $missingPermissions = $requiredPermissions | Where-Object { $PermissionState.permissionName -notcontains $_ }
@@ -66,19 +76,19 @@ function Invoke-CIPPStandardOauthConsentLowSec {
             Write-LogMessage -API 'Standards' -tenant $tenant -message 'All permissions for Application Consent already assigned.' -sev Info
         } else {
             try {
-                $missingPermissions | ForEach-Object {
+                foreach ($Permission in $missingPermissions) {
                     $GraphParam = @{
                         tenantid    = $tenant
                         Uri         = "https://graph.microsoft.com/beta/servicePrincipals(appId='00000003-0000-0000-c000-000000000000')/delegatedPermissionClassifications"
                         Type        = 'POST'
                         Body        = @{
-                            permissionName = $_
+                            permissionName = $Permission
                             classification = 'low'
                         } | ConvertTo-Json
                         ContentType = 'application/json'
                     }
                     $null = New-GraphPostRequest @GraphParam
-                    Write-LogMessage -API 'Standards' -tenant $tenant -message "Permission $_ has been added to low Application Consent" -sev Info
+                    Write-LogMessage -API 'Standards' -tenant $tenant -message "Permission $Permission has been added to low Application Consent" -sev Info
                 }
             } catch {
                 $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
@@ -97,23 +107,21 @@ function Invoke-CIPPStandardOauthConsentLowSec {
     }
 
     if ($Settings.report -eq $true) {
-        if ($State.permissionGrantPolicyIdsAssignedToDefaultUserRole -notin @('managePermissionGrantsForSelf.microsoft-user-default-low')) {
-            $State.permissionGrantPolicyIdsAssignedToDefaultUserRole = $false
-            $ValueField = @{
-                authorizationPolicy       = $State.permissionGrantPolicyIdsAssignedToDefaultUserRole
-                permissionClassifications = $PermissionState
+        $CurrentValue = @{
+            permissionGrantPolicyIdsAssignedToDefaultUserRole = $State.permissionGrantPolicyIdsAssignedToDefaultUserRole
+        }
+        # Add conflicting standard info if applicable
+        if ($ConflictingStandard) {
+            $CurrentValue.conflictingStandard = @{
+                name       = $ConflictingStandard.Standard
+                templateid = $ConflictingStandard.TemplateId
             }
-            if ($ConflictingStandard) {
-                $ValueField.conflictingStandard = @{
-                    name       = $ConflictingStandard.Standard
-                    templateid = $ConflictingStandard.TemplateId
-                }
-            }
-        } else {
-            $State.permissionGrantPolicyIdsAssignedToDefaultUserRole = $true
-            $ValueField = $true
+        }
+
+        $ExpectedValue = @{
+            permissionGrantPolicyIdsAssignedToDefaultUserRole = @('managePermissionGrantsForSelf.microsoft-user-default-low')
         }
         Add-CIPPBPAField -FieldName 'OauthConsentLowSec' -FieldValue $State.permissionGrantPolicyIdsAssignedToDefaultUserRole -StoreAs bool -Tenant $tenant
-        Set-CIPPStandardsCompareField -FieldName 'standards.OauthConsentLowSec' -FieldValue $ValueField -Tenant $tenant
+        Set-CIPPStandardsCompareField -FieldName 'standards.OauthConsentLowSec' -CurrentValue $CurrentValue -ExpectedValue $ExpectedValue -Tenant $tenant
     }
 }

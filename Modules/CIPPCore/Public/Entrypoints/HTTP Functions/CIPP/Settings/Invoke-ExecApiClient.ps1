@@ -101,7 +101,7 @@ function Invoke-ExecApiClient {
         'GetAzureConfiguration' {
             $Owner = $env:WEBSITE_OWNER_NAME
             Write-Information "Owner: $Owner"
-            if ($Owner -match '^(?<SubscriptionId>[^+]+)\+(?<RGName>[^-]+(?:-[^-]+)*?)(?:-[^-]+webspace(?:-Linux)?)?$') {
+            if ($env:WEBSITE_SKU -ne 'FlexConsumption' -and $Owner -match '^(?<SubscriptionId>[^+]+)\+(?<RGName>[^-]+(?:-[^-]+)*?)(?:-[^-]+webspace(?:-Linux)?)?$') {
                 $RGName = $Matches.RGName
             } else {
                 $RGName = $env:WEBSITE_RESOURCE_GROUP
@@ -123,7 +123,7 @@ function Invoke-ExecApiClient {
         'SaveToAzure' {
             $TenantId = $env:TenantID
             $Owner = $env:WEBSITE_OWNER_NAME
-            if ($Owner -match '^(?<SubscriptionId>[^+]+)\+(?<RGName>[^-]+(?:-[^-]+)*?)(?:-[^-]+webspace(?:-Linux)?)?$') {
+            if ($env:WEBSITE_SKU -ne 'FlexConsumption' -and $Owner -match '^(?<SubscriptionId>[^+]+)\+(?<RGName>[^-]+(?:-[^-]+)*?)(?:-[^-]+webspace(?:-Linux)?)?$') {
                 $RGName = $Matches.RGName
             } else {
                 $RGName = $env:WEBSITE_RESOURCE_GROUP
@@ -148,7 +148,7 @@ function Invoke-ExecApiClient {
             if (!$Client) {
                 $Results = @{
                     resultText = 'API client not found'
-                    severity   = 'error'
+                    state      = 'error'
                 }
             } else {
                 $ApiConfig = New-CIPPAPIConfig -ResetSecret -AppId $Request.Body.ClientId -Headers $Request.Headers
@@ -192,7 +192,7 @@ function Invoke-ExecApiClient {
                     $Body = @{ Results = "API client $ClientId not found or not a valid CIPP-API application" }
                 }
             } catch {
-                Write-LogMessage -headers $Request.Headers -API 'ExecApiClient' -message "Failed to remove app registration for $ClientId" -Sev 'Warning'
+                Write-LogMessage -headers $Request.Headers -API 'ExecApiClient' -message "Failed to remove app registration for $ClientId" -sev 'Warn'
             }
         }
         default {
@@ -200,7 +200,7 @@ function Invoke-ExecApiClient {
         }
     }
 
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = $Body
         })
